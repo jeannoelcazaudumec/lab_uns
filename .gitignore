@@ -1,0 +1,50 @@
+# Database runtime persistence
+timescaledb/data/*
+!timescaledb/data/.gitkeep
+dynamodb/data/*
+!dynamodb/data/.gitkeep
+
+# Mosquitto broker persistence and audit logs
+mosquitto/data/*
+!mosquitto/data/.gitkeep
+mosquitto/log/*
+!mosquitto/log/.gitkeep
+mosquitto-uns/data/*
+!mosquitto-uns/data/.gitkeep
+mosquitto-uns/log/*
+!mosquitto-uns/log/.gitkeep
+
+# Grafana runtime artifacts
+grafana/plugins/
+grafana/data/
+grafana/png/
+
+# Node-RED runtime backups, configs and dependencies
+nodered/data/node_modules/
+nodered-app/data/node_modules/
+.config.*
+.sessions.json
+*.backup
+.*.backup
+.flows.json.backup
+.*.json.backup
+
+# Python bytecode and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Operating System and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

@@ -1,0 +1,42 @@
+input:
+  mqtt:
+    urls:
+      - "tcp://mosquitto-uns:1883"
+    topics:
+      - "enterprise/plant/area/sub-area/cell/+/telemetry/"
+    client_id: "redpanda-connect-dynamodb"
+    clean_session: false
+    qos: 1
+    auto_replay_nacks: true
+
+pipeline:
+  processors:
+    - mapping: |
+        root = this
+        root.topic = if this.topic != null { this.topic } else { @mqtt_topic }
+        root.asset_id = this.asset_id.or("unknown")
+        root.part_number = this.part_number.or("UNKNOWN")
+        root.timestamp = this.timestamp.or(now())
+    - log:
+        level: DEBUG
+        message: "Streaming from Mosquitto Central UNS to DynamoDB: asset=${!json(\"asset_id\")} part=${!json(\"part_number\")} device=${!json(\"device\")} temp=${!json(\"temperature\")}°C hum=${!json(\"humidity\")}% ts=${!json(\"timestamp\")}"
+
+output:
+  aws_dynamodb:
+    table: "asset_telemetry"
+    endpoint: "http://dynamodb-local:8000"
+    region: "us-east-1"
+    credentials:
+      id: "local"
+      secret: "local"
+    batching:
+      count: 25
+      period: 500ms
+    string_columns:
+      asset_id: "${!json(\"asset_id\")}"
+      timestamp: "${!json(\"timestamp\")}"
+      part_number: "${!json(\"part_number\")}"
+      device: "${!json(\"device\")}"
+      topic: "${!json(\"topic\")}"
+    json_map_columns:
+      payload: "."

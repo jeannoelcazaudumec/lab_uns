@@ -1,0 +1,354 @@
+services:
+  modbus1:
+    build:
+      context: ./modbus1
+      dockerfile: Dockerfile
+    container_name: modbus1
+    restart: unless-stopped
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    ports:
+      - "${MODBUS1_HOST_PORT:-502}:502"
+    networks:
+      - level0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  modbus2:
+    build:
+      context: ./modbus2
+      dockerfile: Dockerfile
+    container_name: modbus2
+    restart: unless-stopped
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    ports:
+      - "${MODBUS2_HOST_PORT:-503}:502"
+    networks:
+      - level0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  opcua1:
+    build:
+      context: ./opcua1
+      dockerfile: Dockerfile
+    image: nodered-opcua1:latest
+    container_name: opcua1
+    restart: unless-stopped
+    ports:
+      - "4840:4840"
+    networks:
+      - level0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192M
+
+  mosquitto-uns:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto-uns
+    restart: unless-stopped
+    ports:
+      - "1884:1883"
+      - "8083:8000"
+    networks:
+      - it_dmz
+    volumes:
+      - ./mosquitto-uns/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto-uns/data:/mosquitto/data
+      - ./mosquitto-uns/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/version' -C 1 -W 2 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    networks:
+      - edge_ot_it
+      - it_dmz
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/version' -C 1 -W 2 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  nodered:
+    build:
+      context: ./nodered
+      dockerfile: Dockerfile
+    image: nodered-custom:latest
+    container_name: nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    networks:
+      - level0
+      - edge_ot_it
+    volumes:
+      - ./nodered/data:/data
+    depends_on:
+      modbus1:
+        condition: service_started
+      modbus2:
+        condition: service_started
+      opcua1:
+        condition: service_started
+      mosquitto:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: telemetry
+    ports:
+      - "5432:5432"
+    networks:
+      - it
+    volumes:
+      - ./timescaledb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./timescaledb/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d telemetry -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 1024M
+
+  uns-enricher:
+    build:
+      context: ./connect/uns-enricher
+      dockerfile: Dockerfile
+    image: nodered-uns-enricher:latest
+    container_name: uns-enricher
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=mosquitto-uns
+      - MQTT_PORT=1883
+      - MQTT_CLIENT_ID=uns-enricher
+      - MES_STATE_TOPIC=enterprise/plant/area/sub-area/cell/mes/state/
+      - RAW_TELEMETRY_TOPIC=enterprise/plant/area/sub-area/cell/+/raw/
+    networks:
+      - it_dmz
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 192M
+
+  mqtt-to-timescale:
+    build:
+      context: ./connect/mqtt-to-timescale
+      dockerfile: Dockerfile
+    image: nodered-mqtt-to-timescale:latest
+    container_name: mqtt-to-timescale
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=mosquitto-uns
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=enterprise/plant/area/sub-area/cell/+/telemetry/
+      - DLQ_TOPIC=enterprise/plant/area/sub-area/cell/+/dlq/
+      - MQTT_CLIENT_ID=timescaledb-group
+      - BROKER_LOG=/broker-log/mosquitto.log
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_NAME=telemetry
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    volumes:
+      - ./mosquitto-uns/log:/broker-log:ro
+    networks:
+      - it_dmz
+      - it
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamodb-local
+    restart: unless-stopped
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    ports:
+      - "8000:8000"
+    networks:
+      - it
+    volumes:
+      - ./dynamodb/data:/home/dynamodblocal/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  dynamodb-init:
+    image: python:3.11-slim
+    container_name: dynamodb-init
+    restart: "no"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - DYNAMODB_TABLE=asset_telemetry
+    command: ["python", "/app/init_table.py"]
+    networks:
+      - it
+    volumes:
+      - ./dynamodb/init_table.py:/app/init_table.py:ro
+    depends_on:
+      - dynamodb-local
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  connect-uns-to-dynamodb:
+    image: docker.redpanda.com/redpandadata/connect:latest
+    container_name: connect-uns-to-dynamodb
+    restart: unless-stopped
+    command:
+      - run
+      - --chilled
+      - /etc/redpanda-connect/config.yaml
+    networks:
+      - it_dmz
+      - it
+    volumes:
+      - ./connect/mosquitto-to-dynamodb.yaml:/etc/redpanda-connect/config.yaml:ro
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+      dynamodb-local:
+        condition: service_started
+      dynamodb-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  grafana:
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile
+    image: nodered-grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    networks:
+      - it
+      - it_dmz
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PLUGINS_AUTO_UPDATE=false
+      - GF_PLUGINS_CHECK_FOR_UPDATES=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto-uns:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+
+  nodered-asset3:
+    build:
+      context: ./nodered-app
+      dockerfile: Dockerfile
+    image: nodered-asset3-consumer:latest
+    container_name: nodered-asset3
+    restart: unless-stopped
+    ports:
+      - "1881:1880"
+    networks:
+      - it
+      - it_dmz
+    volumes:
+      - ./nodered-app/data:/data
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+
+networks:
+  level0:
+    name: level0
+    driver: bridge
+  edge_ot_it:
+    name: edge_ot_it
+    driver: bridge
+  it_dmz:
+    name: it_dmz
+    driver: bridge
+  it:
+    name: it
+    driver: bridge

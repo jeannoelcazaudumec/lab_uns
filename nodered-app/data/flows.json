@@ -1,0 +1,80 @@
+[
+  {
+    "id": "tab_asset3_consumer",
+    "type": "tab",
+    "label": "Asset 3 UNS Consumer",
+    "disabled": false,
+    "info": "Consumes telemetry events from Mosquitto Central UNS and filters/processes Asset 3 telemetry."
+  },
+  {
+    "id": "mosquitto_broker_uns",
+    "type": "mqtt-broker",
+    "name": "Mosquitto Central UNS Broker",
+    "broker": "mosquitto-uns",
+    "port": "1883",
+    "clientid": "nodered-asset3-consumer-app",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": false,
+    "autoUnsubscribe": false
+  },
+  {
+    "id": "mqtt_in_asset3_telemetry",
+    "type": "mqtt in",
+    "z": "tab_asset3_consumer",
+    "name": "Mosquitto UNS Asset 3 Telemetry",
+    "topic": "enterprise/plant/area/sub-area/cell/asset_3/telemetry/",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mosquitto_broker_uns",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 160,
+    "y": 140,
+    "wires": [
+      [
+        "func_filter_asset3"
+      ]
+    ]
+  },
+  {
+    "id": "func_filter_asset3",
+    "type": "function",
+    "z": "tab_asset3_consumer",
+    "name": "Process Asset 3 Payloads",
+    "func": "let data = msg.payload;\ntry {\n    if (typeof data === 'string') {\n        data = JSON.parse(data);\n    }\n} catch (e) {\n    node.error('JSON parse error: ' + e.message, msg);\n    return null;\n}\n\nif (data && (data.asset_id === 'asset_3' || (msg.topic && msg.topic.includes('asset_3')))) {\n    msg.payload = data;\n    const part = data.part_number ? (' | Part: ' + data.part_number) : '';\n    node.status({ fill: 'green', shape: 'dot', text: 'Asset 3: ' + data.temperature + '°C | ' + data.motor_speed + ' RPM' + part });\n    return msg;\n}\n\nreturn null;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 140,
+    "wires": [
+      [
+        "debug_asset3_output"
+      ]
+    ]
+  },
+  {
+    "id": "debug_asset3_output",
+    "type": "debug",
+    "z": "tab_asset3_consumer",
+    "name": "Asset 3 Output",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 660,
+    "y": 140,
+    "wires": []
+  }
+]

@@ -1,0 +1,292 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Live Temperature Stream (Direct from Mosquitto Central UNS)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-mqtt-datasource",
+        "uid": "mosquitto-uns"
+      },
+      "targets": [
+        {
+          "refId": "Asset1",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_1/telemetry/"
+        },
+        {
+          "refId": "Asset2",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_2/telemetry/"
+        },
+        {
+          "refId": "Asset3",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_3/telemetry/"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "time",
+                "temperature"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "axisPlacement": "auto"
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "calcs": [
+            "last",
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Live Humidity Stream (Direct from Mosquitto Central UNS)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "grafana-mqtt-datasource",
+        "uid": "mosquitto-uns"
+      },
+      "targets": [
+        {
+          "refId": "Asset1",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_1/telemetry/"
+        },
+        {
+          "refId": "Asset2",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_2/telemetry/"
+        },
+        {
+          "refId": "Asset3",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/asset_3/telemetry/"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "time",
+                "humidity"
+              ]
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "axisPlacement": "auto"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "calcs": [
+            "last",
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Live Mosquitto Central UNS Enriched Telemetry Stream (With Active Part Number)",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "grafana-mqtt-datasource",
+        "uid": "mosquitto-uns"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/+/telemetry/"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Live Schema Validation \u2014 Dead-Letter Queue (.../+/dlq/)",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "grafana-mqtt-datasource",
+        "uid": "mosquitto-uns"
+      },
+      "targets": [
+        {
+          "refId": "DLQ",
+          "datasource": {
+            "type": "grafana-mqtt-datasource",
+            "uid": "mosquitto-uns"
+          },
+          "topic": "enterprise/plant/area/sub-area/cell/+/dlq/"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "modbus",
+    "mosquitto",
+    "mqtt",
+    "streaming",
+    "live"
+  ],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Mosquitto Central UNS Streaming Telemetry - Direct MQTT Stream",
+  "uid": "mosquitto-telemetry",
+  "version": 1
+}

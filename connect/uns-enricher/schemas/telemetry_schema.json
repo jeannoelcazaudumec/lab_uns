@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uns.enterprise.local/schemas/raw-asset-telemetry.json",
+  "title": "UNS Raw Equipment Telemetry Contract",
+  "description": "Strict JSON Schema governing raw OT asset payloads entering the Mosquitto Unified Namespace before enrichment.",
+  "type": "object",
+  "required": [
+    "asset_id",
+    "device",
+    "temperature",
+    "humidity",
+    "timestamp"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "pattern": "^asset_[1-9][0-9]*$",
+      "description": "Canonical ISA-95 cell asset identifier (e.g., asset_1, asset_2, asset_3)"
+    },
+    "device": {
+      "type": "string",
+      "enum": ["modbus1", "modbus2", "opcua1"],
+      "description": "Physical or simulated PLC/server identifier"
+    },
+    "protocol": {
+      "type": "string",
+      "enum": ["modbus-tcp", "opc-ua"]
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": -40.0,
+      "maximum": 150.0,
+      "description": "Process temperature in degrees Celsius (-40.0 to 150.0)"
+    },
+    "humidity": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "description": "Relative humidity percentage (0.0 to 100.0)"
+    },
+    "motor_speed": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 5000.0,
+      "description": "Optional spindle/motor speed in RPM (0.0 to 5000.0)"
+    },
+    "raw_registers": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 10,
+      "description": "ISO-8601 UTC event timestamp"
+    },
+    "topic": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
