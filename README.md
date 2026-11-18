@@ -126,7 +126,7 @@ docker compose ps -a
 
 Comprehensive operational and architectural documentation is available in the [`README/`](./README/) directory:
 
-- [**README_MQTT_TO_KINEYSYS.md**](./README/README_MQTT_TO_KINEYSYS.md): Production MQTT-to-AWS Kinesis streaming ingestion pipeline, LocalStack emulation, 25 KB Put Payload Unit (PPU) economics, Gzip compression, multi-record `PutRecords` batching, and verification playbook.
+- [**README_MQTT_TO_KINESIS.md**](./README/README_MQTT_TO_KINESIS.md): Production MQTT-to-AWS Kinesis streaming ingestion pipeline, LocalStack emulation, 25 KB Put Payload Unit (PPU) economics, Gzip compression, multi-record `PutRecords` batching, and verification playbook.
 - [**README_MQTT_TO_S3.md**](./README/README_MQTT_TO_S3.md): Production MQTT-to-S3 ingestion pipeline, MinIO simulation, S3 cost optimization strategies (>99.9% PUT API reduction, 128 KB minimum billable size mitigation, VPC Gateway Endpoints), dynamic buffering, and verification commands.
 - [**README-nodered.md**](./README/README-nodered.md): Complete guide to the data pipeline, schemas, topic naming conventions, and network architecture.
 - [**README_DEMO.txt**](./README/README_DEMO.txt): Chronological, step-by-step presenter script and demonstration commands.
