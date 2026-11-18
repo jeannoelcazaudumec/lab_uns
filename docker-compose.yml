@@ -142,6 +142,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: telemetry
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     networks:
@@ -278,6 +279,139 @@ services:
         condition: service_started
       dynamodb-init:
         condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  minio:
+    image: alpine/minio:latest-release
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - TZ=${TZ:-America/Toronto}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - it
+    volumes:
+      - ./minio/data:/data
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/wget -q --spider http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  mqtt-to-s3:
+    build:
+      context: ./connect/mqtt-to-s3
+      dockerfile: Dockerfile
+    image: nodered-mqtt-to-s3:latest
+    container_name: mqtt-to-s3
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/Toronto}
+      - MQTT_HOST=mosquitto-uns
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=enterprise/plant/area/sub-area/cell/+/telemetry/
+      - MQTT_CLIENT_ID=mqtt-to-s3-lake
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_BUCKET=telemetry-lake
+      - S3_PREFIX=telemetry
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+      - BUFFER_MAX_RECORDS=50
+      - BUFFER_MAX_BYTES=1048576
+      - BUFFER_MAX_SECONDS=15
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - it_dmz
+      - it
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  localstack:
+    image: localstack/localstack:3.7.0
+    container_name: localstack
+    restart: unless-stopped
+    environment:
+      - SERVICES=kinesis
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "127.0.0.1:4566:4566"
+    networks:
+      - it_dmz
+      - it
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -s http://127.0.0.1:4566/_localstack/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1024M
+
+  mqtt-to-kinesis:
+    build:
+      context: ./connect/mqtt-to-kinesis
+      dockerfile: Dockerfile
+    image: nodered-mqtt-to-kinesis:latest
+    container_name: mqtt-to-kinesis
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/Toronto}
+      - MQTT_HOST=mosquitto-uns
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=enterprise/plant/area/sub-area/cell/+/telemetry/
+      - MQTT_CLIENT_ID=mqtt-to-kinesis-ingestor
+      - KINESIS_ENDPOINT_URL=http://localstack:4566
+      - KINESIS_STREAM_NAME=iiot-telemetry-stream
+      - KINESIS_SHARD_COUNT=1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AGGREGATION_MAX_RECORDS=50
+      - AGGREGATION_MAX_BYTES=24576
+      - AGGREGATION_MAX_SECONDS=5.0
+      - BATCH_MAX_RECORDS=100
+      - BATCH_MAX_BYTES=4194304
+      - BATCH_MAX_SECONDS=2.0
+      - GZIP_COMPRESS_LEVEL=6
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - it_dmz
+      - it
+    depends_on:
+      mosquitto-uns:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     deploy:
       resources:
         limits:

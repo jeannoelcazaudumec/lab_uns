@@ -3,6 +3,8 @@ timescaledb/data/*
 !timescaledb/data/.gitkeep
 dynamodb/data/*
 !dynamodb/data/.gitkeep
+minio/data/*
+!minio/data/.gitkeep
 
 # Mosquitto broker persistence and audit logs
 mosquitto/data/*

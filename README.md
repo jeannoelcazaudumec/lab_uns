@@ -34,6 +34,10 @@ flowchart TD
         DDB["dynamodb-local (NoSQL Store)\n(Port 8000)"]
         GF["grafana (3 Dashboards: UNS Control Center, Live MQTT & SQL)\n(Port 3001:3000)"]
         NR3["nodered-asset3 (Asset 3 App)\n(Port 1881:1880)"]
+        M2S["mqtt-to-s3 (Streaming Buffer & Gzip NDJSON)"]
+        MIO["minio (Local S3 Simulation)\n(Port 9000 API, 9001 Console)"]
+        M2K["mqtt-to-kinesis (25 KB PPU Aggregation & Gzip PutRecords)"]
+        LSK["localstack (Local AWS Kinesis Emulation)\n(Port 4566)"]
     end
 
     %% Flows
@@ -49,6 +53,10 @@ flowchart TD
     MUNS -->|"Persistent QoS 1 Sub (.../+/telemetry/ & .../+/dlq/)"| MTS
     MUNS -->|"Persistent QoS 1 Sub (.../+/telemetry/)"| CHD
     MUNS -->|"QoS 1 Sub (.../asset_3/telemetry/)"| NR3
+    MUNS -->|"Persistent QoS 1 Sub (.../+/telemetry/)"| M2S
+    M2S -->|"Micro-Batched Gzip NDJSON (Hive Partitioned)"| MIO
+    MUNS -->|"Persistent QoS 1 Sub (.../+/telemetry/)"| M2K
+    M2K -->|"PutRecords (Aggregated & Gzip NDJSON)"| LSK
     MTS -->|"SQL Insert (asset_telemetry, asset_dlq & uns_*)"| TS
     DDBI -.->|"CreateTable (asset_telemetry)"| DDB
     CHD -->|"PutItem (aws_dynamodb)"| DDB
@@ -74,6 +82,10 @@ flowchart TD
 | **Connect: UNS -> DynamoDB** | `connect-uns-to-dynamodb` | `it_dmz`, `it` | `4195` | - | Redpanda Connect streaming UNS telemetry into DynamoDB. |
 | **DynamoDB Local** | `dynamodb-local` | `it` | `8000` | `8000` | Local AWS DynamoDB instance persisting items in `./dynamodb/data`. |
 | **DynamoDB Init** | `dynamodb-init` | `it` | - | - | One-shot init container provisioning `asset_telemetry` table. |
+| **MQTT to S3 Ingestor** | `mqtt-to-s3` | `it_dmz`, `it` | - | - | Production streaming buffer, Gzip NDJSON compression & Hive-partitioned S3 upload. |
+| **MinIO (Local S3)** | `minio` | `it` | `9000`, `9001` | `9000`, `9001` | Local S3 API simulation and Web Console storage backend. |
+| **MQTT to Kinesis** | `mqtt-to-kinesis` | `it_dmz`, `it` | - | - | 25 KB PPU aggregated & Gzip-compressed AWS Kinesis streaming ingestion microservice. |
+| **LocalStack (AWS Kinesis)** | `localstack` | `it_dmz`, `it` | `4566` | `4566` | Local AWS Kinesis cloud emulation service. |
 | **Grafana** | `grafana` | `it`, `it_dmz` | `3000` | `3001` | Pre-configured dashboards: Control Center, MQTT Live Stream, SQL Telemetry. |
 | **Node-RED App** | `nodered-asset3` | `it`, `it_dmz` | `1880` | `1881` | IT Consumer Application consuming `asset_3` telemetry from Central UNS. |
 
@@ -83,7 +95,7 @@ flowchart TD
 
 ### 1. Prerequisites
 - Docker Engine 20.10+ and Docker Compose v2.0+
-- Host ports available: `502`, `503`, `1880`, `1881`, `1883`, `1884`, `3001`, `4840`, `5432`, `8000`, `8083`
+- Host ports available: `502`, `503`, `1880`, `1881`, `1883`, `1884`, `3001`, `4566`, `4840`, `5432`, `8000`, `8083`, `9000`, `9001`
 
 ### 2. Launch the Pipeline
 ```bash
@@ -101,6 +113,9 @@ docker compose ps -a
 | **Grafana Observability** | [http://localhost:3001](http://localhost:3001) | `admin` / `admin` |
 | **Node-RED OT Gateway** | [http://localhost:1880](http://localhost:1880) | None |
 | **Node-RED Asset 3 IT App** | [http://localhost:1881](http://localhost:1881) | None |
+| **MinIO S3 Web Console** | [http://localhost:9001](http://localhost:9001) | `minioadmin` / `minioadmin` |
+| **MinIO S3 API Endpoint** | [http://localhost:9000](http://localhost:9000) | `minioadmin` / `minioadmin` |
+| **LocalStack AWS Kinesis API** | [http://localhost:4566](http://localhost:4566) | `test` / `test` |
 | **Mosquitto Central UNS (MQTT)** | `localhost:1884` (TCP) / `ws://localhost:8083` (WebSocket) | Anonymous |
 | **TimescaleDB (PostgreSQL)** | `localhost:5432` (`telemetry`) | `postgres` / `postgres` |
 | **DynamoDB Local** | [http://localhost:8000](http://localhost:8000) | `local` / `local` |
@@ -111,6 +126,8 @@ docker compose ps -a
 
 Comprehensive operational and architectural documentation is available in the [`README/`](./README/) directory:
 
+- [**README_MQTT_TO_KINEYSYS.md**](./README/README_MQTT_TO_KINEYSYS.md): Production MQTT-to-AWS Kinesis streaming ingestion pipeline, LocalStack emulation, 25 KB Put Payload Unit (PPU) economics, Gzip compression, multi-record `PutRecords` batching, and verification playbook.
+- [**README_MQTT_TO_S3.md**](./README/README_MQTT_TO_S3.md): Production MQTT-to-S3 ingestion pipeline, MinIO simulation, S3 cost optimization strategies (>99.9% PUT API reduction, 128 KB minimum billable size mitigation, VPC Gateway Endpoints), dynamic buffering, and verification commands.
 - [**README-nodered.md**](./README/README-nodered.md): Complete guide to the data pipeline, schemas, topic naming conventions, and network architecture.
 - [**README_DEMO.txt**](./README/README_DEMO.txt): Chronological, step-by-step presenter script and demonstration commands.
 - [**README-Transport.md**](./README/README-Transport.md): Deployment and portability guide for fresh machines and WSL2 environments.
@@ -127,3 +144,4 @@ Comprehensive operational and architectural documentation is available in the [`
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
+
